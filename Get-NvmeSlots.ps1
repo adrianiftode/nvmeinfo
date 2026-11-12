@@ -442,6 +442,19 @@ function Read-SmbiosTable {
                         BusSpecified  = ($bus -ne 0 -and $bus -ne 0xFF)
                         DevFnSpecified = ($devFn -ne 0 -and $devFn -ne 0xFF)
                         IsM2          = ($typeCode -ge 0x14 -and $typeCode -le 0x17)
+                        # Only connector types that explicitly describe PCI/PCIe-capable
+                        # expansion interfaces participate in PCIe endpoint matching.
+                        # Keep other Type 9 records in the inventory, but don't treat
+                        # generic/legacy/unknown entries (e.g. a SIM card slot) as PCIe.
+                        IsPcie        = (
+                            $typeCode -in @(
+                                0x06, 0x0E, 0x12, 0x17,
+                                0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25,
+                                0x26, 0x27, 0x28, 0x29,
+                                0x35..0x58, 0x59, 0x5A,
+                                0xA5..0xAB
+                            )
+                        )
                         Occupants     = @()
                         Status        = ''
                         Confidence    = 'unmapped'
@@ -841,6 +854,7 @@ function Get-SlotCandidates {
 
     foreach ($endpoint in $Endpoints) {
         foreach ($slot in $Slots) {
+            if (-not $slot.IsPcie) { continue }
             foreach ($entry in $endpoint.Ports) {
                 $port = $entry.Device
                 if ($null -eq $port.Bus -or $null -eq $port.DevFn) { continue }
@@ -1232,7 +1246,9 @@ function Write-ConsoleReport {
     $drives = @($Analysis.Drives | Sort-Object DriveNumber)
     $slots = @($Analysis.Slots)
     $mapped = @($drives | Where-Object { $_.Confidence -ne 'unmapped' }).Count
-    $occupied = @($slots | Where-Object { $_.Occupants.Count -gt 0 }).Count
+    $pcieSlots = @($slots | Where-Object { $_.IsPcie })
+    $occupied = @($pcieSlots | Where-Object { $_.Occupants.Count -gt 0 }).Count
+    $nonPcieSlots = $slots.Count - $pcieSlots.Count
 
     Write-ColorLine ('=' * 114) Cyan
     Write-ColorLine ' NVMe Slot Report' Cyan
@@ -1244,7 +1260,10 @@ function Write-ConsoleReport {
     Write-ColorLine (' SMBIOS    : {0}' -f $smbios.Version)
     Write-ColorLine (' OS        : {0}' -f $osText)
     Write-ColorLine (' Generated : {0}' -f $Analysis.Generated.ToString('yyyy-MM-dd HH:mm:ss'))
-    Write-ColorLine (' Summary   : {0} NVMe drive(s), {1} mapped, {2} of {3} slots occupied' -f $drives.Count, $mapped, $occupied, $slots.Count)
+    Write-ColorLine (' Summary   : {0} NVMe drive(s), {1} mapped, {2} of {3} PCIe-capable slots occupied' -f $drives.Count, $mapped, $occupied, $pcieSlots.Count)
+    if ($nonPcieSlots -gt 0) {
+        Write-ColorLine ('             {0} non-PCIe/unknown SMBIOS Type 9 entr(y/ies) excluded from PCIe matching' -f $nonPcieSlots) DarkGray
+    }
 
     Write-ColorLine ''
     Write-ColorLine ('NVMe drives ({0})' -f $drives.Count) Cyan
@@ -1434,7 +1453,8 @@ function New-HtmlReport {
     $drives = @($Analysis.Drives | Sort-Object DriveNumber)
     $slots = @($Analysis.Slots)
     $mappedCount = @($drives | Where-Object { $_.Confidence -ne 'unmapped' }).Count
-    $occupiedCount = @($slots | Where-Object { $_.Occupants.Count -gt 0 }).Count
+    $pcieSlots = @($slots | Where-Object { $_.IsPcie })
+    $occupiedCount = @($pcieSlots | Where-Object { $_.Occupants.Count -gt 0 }).Count
     $unmappedDrives = @($drives | Where-Object { $_.Confidence -eq 'unmapped' })
     $unmatchedSlots = @($slots | Where-Object { $_.Occupants.Count -eq 0 -and $_.UsageName -eq 'In Use' })
 
@@ -1642,7 +1662,7 @@ footer { color: #7a8797; font-size: 12px; text-align: center; padding: 8px; }
     [void]$sb.AppendLine('<div class="cards">')
     [void]$sb.AppendLine('<div class="card"><div class="label">NVMe drives</div><div class="value">' + $drives.Count + '</div></div>')
     [void]$sb.AppendLine('<div class="card"><div class="label">Mapped to a slot</div><div class="value">' + $mappedCount + '</div></div>')
-    [void]$sb.AppendLine('<div class="card"><div class="label">Slots occupied</div><div class="value">' + $occupiedCount + ' <span class="muted">of ' + $slots.Count + '</span></div></div>')
+    [void]$sb.AppendLine('<div class="card"><div class="label">PCIe slots occupied</div><div class="value">' + $occupiedCount + ' <span class="muted">of ' + $pcieSlots.Count + '</span></div></div>')
     [void]$sb.AppendLine('<div class="card"><div class="label">Unmapped drives</div><div class="value">' + $unmappedDrives.Count + '</div></div>')
     [void]$sb.AppendLine('</div>')
 
@@ -1716,6 +1736,8 @@ function Get-JsonModel {
             designation    = [string]$slot.Designation
             type           = [string]$slot.TypeName
             typeCode       = $slot.TypeCode
+            isPcie         = [bool]$slot.IsPcie
+            isM2           = [bool]$slot.IsM2
             width          = [string]$slot.WidthName
             widthCode      = $slot.WidthCode
             usage          = [string]$slot.UsageName
