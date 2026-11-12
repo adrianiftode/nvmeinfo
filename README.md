@@ -119,7 +119,7 @@ the folder where the command was started.
 ```
 
 - **JSON** contains the system/SMBIOS information, every slot with its
-  occupants, every NVMe drive, and the unmapped-drive list.
+  occupants and PCIe/M.2 classification, every NVMe drive, and the unmapped-drive list.
 - **CSV** contains one row per slot occupant, plus one row per empty slot and
   one row per unmapped NVMe drive.
 
@@ -156,8 +156,9 @@ The console report has three main parts:
    negotiated link, match confidence, and health.
 2. **Connection paths** - the PCI address of the controller, the upstream port
    and its firmware (ACPI) name, and the final slot label.
-3. **Slot occupancy** - every SMBIOS slot, including empty ones, with all
-   detected occupants.
+3. **Slot occupancy** - every SMBIOS Type 9 entry, including non-PCIe entries;
+   only recognized PCI/PCIe-capable connector types participate in PCIe matching
+   and the PCIe occupancy summary.
 
 ### Confidence levels
 
@@ -193,7 +194,9 @@ the firmware actually reported.
 ## Limitations and notes
 
 - Slot labels exist only if the motherboard firmware publishes SMBIOS Type 9
-  records. Some boards publish only a subset, or publish generic labels.
+  records. Some boards publish only a subset, or publish generic labels. All Type 9
+  entries remain visible, but generic, unknown, and non-PCIe connector types are
+  excluded from PCIe endpoint matching and PCIe occupancy totals.
 - Firmware may report the PCIe **port** address (as this ASUS board does) or the
   **endpoint** address. The script prefers the upstream-port interpretation and
   falls back to the port chain; unusual firmware layouts can therefore produce
