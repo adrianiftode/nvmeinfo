@@ -447,14 +447,14 @@ function Read-SmbiosTable {
                         # Keep other Type 9 records in the inventory, but don't treat
                         # generic/legacy/unknown entries (e.g. a SIM card slot) as PCIe.
                         IsPcie        = (
-                            $typeCode -in @(
-                                0x06, 0x0E, 0x12,
-                                0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25,
-                                0x26, 0x27, 0x28, 0x29,
-                                0x59, 0x5A
-                            ) -or
+                            ($typeCode -eq 0x06) -or
+                            ($typeCode -eq 0x0E) -or
+                            ($typeCode -eq 0x12) -or
                             ($typeCode -ge 0x14 -and $typeCode -le 0x17) -or
+                            ($typeCode -ge 0x1F -and $typeCode -le 0x29) -or
                             ($typeCode -ge 0x35 -and $typeCode -le 0x58) -or
+                            ($typeCode -eq 0x59) -or
+                            ($typeCode -eq 0x5A) -or
                             ($typeCode -ge 0xA5 -and $typeCode -le 0xAB)
                         )
                         Occupants     = @()
