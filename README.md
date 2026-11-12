@@ -1,3 +1,9 @@
+It turns out that I have a NVME disk that shares the PCIEX lane with my GPU, thus halving the card's bandwidth.
+After fumbling about with HWinfo, GPU-Z, msinfo and disk manager to find out which drive is that, in order to move it, I set out to fix the situation.
+
+
+Thus I give you **nvmeinfo**:
+
 # NVMe Slot Info
 
 A dependency-free Windows 10 tool that shows which physical motherboard slot
