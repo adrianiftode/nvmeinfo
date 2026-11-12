@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>NvmeSlots</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\Get-NvmeSlots.ps1" LogicalName="NvmeSlots.Script.ps1" />
+  </ItemGroup>
+
+</Project>

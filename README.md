@@ -19,6 +19,10 @@ machine.
 - No installer, .NET download, external module, or internet connection.
 - Administrator rights are **not** required for the normal report.
 
+The native executables in `dist\` are compiled with .NET 10 Native AOT, so they
+do not need the .NET runtime installed. They still use the inbox Windows
+PowerShell 5.1, which is part of Windows 10/11.
+
 The script uses these inbox components:
 
 - `GetSystemFirmwareTable` from `kernel32.dll` for the SMBIOS table.
@@ -33,8 +37,11 @@ The script uses these inbox components:
 | `Get-NvmeSlots.ps1` | Main PowerShell script. |
 | `Run-NvmeSlots.cmd` | Double-click launcher for the console report. |
 | `Run-NvmeSlots-Report.cmd` | Generates `NvmeSlotReport.html` in the current folder and opens it. |
-| `build.ps1` | Builds the standalone executables in `dist\`. |
-| `src\NvmeSlotsLauncher.cs` | Console launcher that embeds the script into the executables. |
+| `build.ps1` | Builds the standalone native executables in `dist\`. |
+| `src\Directory.Build.props` | Shared .NET 10 Native AOT project settings. |
+| `src\Launcher\Program.cs` | Launcher that embeds and runs the script. |
+| `src\Launcher\NvmeSlots.csproj` | Console executable project. |
+| `src\Report\NvmeSlots-Report.csproj` | Report executable project (same launcher, report defaults). |
 | `dist\NvmeSlots.exe` | Standalone console report (build output). |
 | `dist\NvmeSlots-Report.exe` | Standalone HTML report (build output). |
 | `README.md` | This document. |
@@ -65,12 +72,13 @@ The `dist` folder contains two standalone console programs:
 .\dist\NvmeSlots-Report.exe -NoOpen -Json .\report.json
 ```
 
-The executables are self-contained: the PowerShell script is embedded as a
-resource. At launch it is written to a unique temporary file, run with the inbox
-Windows PowerShell 5.1 (`-NoProfile -ExecutionPolicy Bypass`), and deleted
-afterward. They need the same Windows components as the script and no extra
-runtime. Exit codes are passed through, and when started by double-click the
-window stays open at the end.
+The executables are native x64 programs built with .NET 10 Native AOT. They
+have no .NET runtime dependency: the import table contains only Windows
+components. The PowerShell script is embedded as a resource; at launch it is
+written to a unique temporary file, run with the inbox Windows PowerShell 5.1
+(`-NoProfile -ExecutionPolicy Bypass`), and deleted afterward. Exit codes are
+passed through, and when started by double-click the window stays open at the
+end.
 
 The executables are not digitally signed, so SmartScreen or antivirus software
 may warn the first time. Build them locally with:
@@ -79,9 +87,18 @@ may warn the first time. Build them locally with:
 .\build.ps1
 ```
 
-The build uses the C# compiler included with .NET Framework 4.x and needs no
-downloads. It writes both files to `dist\`. Rerun the build after changing the
-PowerShell script so the embedded copy stays current.
+Building needs:
+
+- The .NET 10 SDK.
+- Visual Studio 2022 with the **Desktop development with C++** workload (for the
+  MSVC linker).
+- A Windows SDK. If it is not installed, `build.ps1` downloads the
+  hash-verified `Microsoft.Windows.SDK.CPP.x64` NuGet package once (~51 MB) and
+  caches the import libraries under `%LOCALAPPDATA%\NvmeSlotInfo`. No
+  administrator rights or SDK installer are needed.
+
+The build writes both files to `dist\`. Rerun it after changing the PowerShell
+script so the embedded copy stays current.
 
 ### HTML report
 
@@ -227,6 +244,21 @@ The report intentionally has no external assets. Any modern browser renders it.
 If styles are missing, make sure the file was written completely and the browser
 is not opening a cached older copy.
 
+**The executable says PowerShell could not be started**
+
+The EXE is native, but it delegates the report to the inbox Windows PowerShell
+5.1. Check that
+`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe` exists and is not
+blocked by policy or antivirus software.
+
+**The build cannot find `kernel32.lib` or the platform linker**
+
+Install the Visual Studio **Desktop development with C++** workload. The Windows
+SDK import libraries are downloaded automatically by `build.ps1`; if that
+download is blocked, allow access to `api.nuget.org` or place the
+`Microsoft.Windows.SDK.CPP.x64` package in
+`%LOCALAPPDATA%\NvmeSlotInfo\cache`.
+
 ## Notes for developers
 
 The script is intentionally a single file and ASCII-only for Windows PowerShell
@@ -241,6 +273,13 @@ The script is intentionally a single file and ASCII-only for Windows PowerShell
 
 Slot type, width, and usage codes follow the SMBIOS specification and the
 dmidecode decoding tables.
+
+The launcher is a .NET 10 Native AOT console application. It embeds the script
+as a managed resource, slices arguments with `ProcessStartInfo.ArgumentList`
+(no manual command-line quoting), and forwards the PowerShell exit code. It uses
+no reflection beyond `GetManifestResourceStream`, which keeps the AOT trimmer
+happy. The two executables share `src\Launcher\Program.cs`; only the report build
+defines `REPORT_MODE`.
 
 ## Version
 

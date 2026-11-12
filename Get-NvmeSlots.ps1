@@ -1905,6 +1905,9 @@ try {
         $Html = 'NvmeSlotReport.html'
     }
 
+    Write-ColorLine 'Querying disks, stand by...' Cyan
+    Write-ColorLine ''
+
     Write-Verbose 'Reading the SMBIOS slot table from firmware...'
     $smbios = Read-SmbiosTable
     if ($smbios.Slots.Count -eq 0) {

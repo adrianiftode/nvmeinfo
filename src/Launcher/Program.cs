@@ -4,15 +4,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text;
+using System.Threading;
 
-[assembly: AssemblyTitle("NVMe Slot Info")]
-[assembly: AssemblyDescription("Reports NVMe drives and the motherboard PCIe/M.2 slots they are connected to.")]
-[assembly: AssemblyProduct("NVMe Slot Info")]
-[assembly: AssemblyCompany("NvmeInfo")]
-[assembly: AssemblyCopyright("")]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+namespace NvmeSlots;
 
 internal static class Program
 {
@@ -24,23 +18,34 @@ internal static class Program
     private static int Main(string[] args)
     {
         bool launchedDirectly = IsOnlyProcessOnConsole();
-        string scriptPath = null;
+        string? scriptPath = null;
 
         try
         {
             TrySetTitle();
             scriptPath = ExtractScript();
-            List<string> scriptArgs = BuildScriptArguments(args);
 
-            ProcessStartInfo startInfo = new ProcessStartInfo();
-            startInfo.FileName = GetPowerShellPath();
-            startInfo.Arguments = BuildPowerShellArguments(scriptPath, scriptArgs);
-            startInfo.UseShellExecute = false;
-            startInfo.WorkingDirectory = Environment.CurrentDirectory;
-
-            using (Process process = Process.Start(startInfo))
+            ProcessStartInfo startInfo = new ProcessStartInfo
             {
-                if (process == null)
+                FileName = GetPowerShellPath(),
+                UseShellExecute = false,
+                WorkingDirectory = Environment.CurrentDirectory
+            };
+
+            startInfo.ArgumentList.Add("-NoProfile");
+            startInfo.ArgumentList.Add("-ExecutionPolicy");
+            startInfo.ArgumentList.Add("Bypass");
+            startInfo.ArgumentList.Add("-File");
+            startInfo.ArgumentList.Add(scriptPath);
+
+            foreach (string argument in BuildScriptArguments(args))
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
+
+            using (Process? process = Process.Start(startInfo))
+            {
+                if (process is null)
                 {
                     throw new InvalidOperationException("PowerShell could not be started.");
                 }
@@ -63,6 +68,7 @@ internal static class Program
             {
                 Pause();
             }
+
             return 1;
         }
         finally
@@ -73,10 +79,9 @@ internal static class Program
 
     private static string ExtractScript()
     {
-        Assembly assembly = Assembly.GetExecutingAssembly();
-        using (Stream stream = assembly.GetManifestResourceStream(ScriptResourceName))
+        using (Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(ScriptResourceName))
         {
-            if (stream == null)
+            if (stream is null)
             {
                 throw new InvalidOperationException("The embedded PowerShell script is missing from this executable.");
             }
@@ -103,23 +108,23 @@ internal static class Program
         bool hasOpen = false;
         bool noOpen = false;
 
-        foreach (string arg in args)
+        foreach (string argument in args)
         {
-            if (EqualsArg(arg, "-Html") || arg.StartsWith("-Html:", StringComparison.OrdinalIgnoreCase))
+            if (EqualsArg(argument, "-Html") || argument.StartsWith("-Html:", StringComparison.OrdinalIgnoreCase))
             {
                 hasHtml = true;
             }
-            else if (EqualsArg(arg, "-Open"))
+            else if (EqualsArg(argument, "-Open"))
             {
                 hasOpen = true;
             }
-            else if (EqualsArg(arg, "-NoOpen"))
+            else if (EqualsArg(argument, "-NoOpen"))
             {
                 noOpen = true;
             }
         }
 
-        list.RemoveAll(delegate(string arg) { return EqualsArg(arg, "-NoOpen"); });
+        list.RemoveAll(argument => EqualsArg(argument, "-NoOpen"));
 
         if (!hasHtml)
         {
@@ -146,7 +151,7 @@ internal static class Program
         string systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System);
         if (!string.IsNullOrEmpty(systemDirectory))
         {
-            string candidate = Path.Combine(systemDirectory, @"WindowsPowerShell\v1.0\powershell.exe");
+            string candidate = Path.Combine(systemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
             if (File.Exists(candidate))
             {
                 return candidate;
@@ -154,87 +159,6 @@ internal static class Program
         }
 
         return "powershell.exe";
-    }
-
-    private static string BuildPowerShellArguments(string scriptPath, List<string> scriptArgs)
-    {
-        StringBuilder builder = new StringBuilder();
-        builder.Append("-NoProfile -ExecutionPolicy Bypass -File ");
-        builder.Append(Quote(scriptPath));
-
-        foreach (string arg in scriptArgs)
-        {
-            builder.Append(' ');
-            builder.Append(Quote(arg));
-        }
-
-        return builder.ToString();
-    }
-
-    // Quoting rules used by CommandLineToArgvW and the C runtime.
-    private static string Quote(string value)
-    {
-        if (value == null)
-        {
-            return "\"\"";
-        }
-
-        if (value.Length == 0)
-        {
-            return "\"\"";
-        }
-
-        bool needsQuotes = false;
-        foreach (char c in value)
-        {
-            if (c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '"')
-            {
-                needsQuotes = true;
-                break;
-            }
-        }
-
-        if (!needsQuotes)
-        {
-            return value;
-        }
-
-        StringBuilder builder = new StringBuilder();
-        builder.Append('"');
-        int backslashes = 0;
-
-        foreach (char c in value)
-        {
-            if (c == '\\')
-            {
-                backslashes++;
-                continue;
-            }
-
-            if (c == '"')
-            {
-                builder.Append('\\', (backslashes * 2) + 1);
-                builder.Append('"');
-                backslashes = 0;
-                continue;
-            }
-
-            if (backslashes > 0)
-            {
-                builder.Append('\\', backslashes);
-                backslashes = 0;
-            }
-
-            builder.Append(c);
-        }
-
-        if (backslashes > 0)
-        {
-            builder.Append('\\', backslashes * 2);
-        }
-
-        builder.Append('"');
-        return builder.ToString();
     }
 
     private static void TrySetTitle()
@@ -277,23 +201,40 @@ internal static class Program
         }
     }
 
-    private static void TryDelete(string path)
+    private static void TryDelete(string? path)
     {
         if (string.IsNullOrEmpty(path))
         {
             return;
         }
 
-        try
+        // Antivirus and the indexer can hold a freshly written file briefly, so
+        // retry instead of leaving the extracted script behind.
+        for (int attempt = 0; attempt < 5; attempt++)
         {
-            if (File.Exists(path))
+            try
             {
+                if (!File.Exists(path))
+                {
+                    return;
+                }
+
                 File.Delete(path);
+                return;
             }
-        }
-        catch
-        {
-            // The temporary file is harmless; deletion is best effort.
+            catch (IOException)
+            {
+                Thread.Sleep(100 * (attempt + 1));
+            }
+            catch (UnauthorizedAccessException)
+            {
+                Thread.Sleep(100 * (attempt + 1));
+            }
+            catch
+            {
+                // The temporary file is harmless; deletion is best effort.
+                return;
+            }
         }
     }
 }

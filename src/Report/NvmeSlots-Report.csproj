@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>NvmeSlots-Report</AssemblyName>
+    <DefineConstants>$(DefineConstants);REPORT_MODE</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Launcher\Program.cs" Link="Program.cs" />
+    <EmbeddedResource Include="..\..\Get-NvmeSlots.ps1" LogicalName="NvmeSlots.Script.ps1" />
+  </ItemGroup>
+
+</Project>
