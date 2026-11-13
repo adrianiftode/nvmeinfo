@@ -125,7 +125,7 @@ function Format-LinkComparison {
     $maximum = Format-Link $MaximumSpeed $MaximumWidth
     if ([string]::IsNullOrWhiteSpace($current)) { $current = 'unavailable' }
     if ([string]::IsNullOrWhiteSpace($maximum)) { $maximum = 'unavailable' }
-    return ('{0} (max {1})' -f $current, $maximum)
+    return ('{0} / {1}' -f $current, $maximum)
 }
 
 function Format-Column {
