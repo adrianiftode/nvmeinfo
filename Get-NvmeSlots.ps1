@@ -356,6 +356,12 @@ function Read-SmbiosStringSet {
     }
 }
 
+function Test-IsM2SlotType {
+    param([int]$TypeCode)
+
+    return ($TypeCode -ge 0x14 -and $TypeCode -le 0x17)
+}
+
 function Read-SmbiosTable {
     $raw = [NvmeSlotSmbiosReader]::ReadRawTable()
     if ($raw.Length -lt 8) { throw 'The SMBIOS table returned by firmware is too small.' }
@@ -441,7 +447,7 @@ function Read-SmbiosTable {
                         DevFn         = $devFn
                         BusSpecified  = ($bus -ne 0 -and $bus -ne 0xFF)
                         DevFnSpecified = ($devFn -ne 0 -and $devFn -ne 0xFF)
-                        IsM2          = ($typeCode -ge 0x14 -and $typeCode -le 0x17)
+                        IsM2          = (Test-IsM2SlotType -TypeCode $typeCode)
                         # Only connector types that explicitly describe PCI/PCIe-capable
                         # expansion interfaces participate in PCIe endpoint matching.
                         # Keep other Type 9 records in the inventory, but don't treat
