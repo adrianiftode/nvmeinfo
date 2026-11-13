@@ -1,23 +1,24 @@
 name: PowerShell compatibility
 
-on:
+'on':
   push:
   pull_request:
 
 jobs:
-  compatibility:
-    name: ${{ matrix.engine }}
+  windows-powershell-51:
+    name: Windows PowerShell 5.1
     runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - engine: Windows PowerShell 5.1
-            shell: powershell
-          - engine: PowerShell 7
-            shell: pwsh
     steps:
       - uses: actions/checkout@v4
       - name: Parse script and run compatibility regression tests
-        shell: ${{ matrix.shell }}
+        shell: powershell
+        run: ./tests/Compatibility.Tests.ps1
+
+  powershell-7:
+    name: PowerShell 7
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse script and run compatibility regression tests
+        shell: pwsh
         run: ./tests/Compatibility.Tests.ps1
