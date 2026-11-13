@@ -1,0 +1,24 @@
+name: PowerShell compatibility
+
+'on':
+  push:
+  pull_request:
+
+jobs:
+  windows-powershell-51:
+    name: Windows PowerShell 5.1
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse script and run compatibility regression tests
+        shell: powershell
+        run: ./tests/Compatibility.Tests.ps1
+
+  powershell-7:
+    name: PowerShell 7
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse script and run compatibility regression tests
+        shell: pwsh
+        run: ./tests/Compatibility.Tests.ps1
