@@ -785,6 +785,10 @@ function Get-PciEndpoints {
             PciAddress     = (Format-PciAddress $device.Bus $device.DeviceNumber $device.Function)
             Location       = $device.Location
             BiosName       = $device.BiosName
+            LinkSpeed      = $device.LinkSpeed
+            LinkWidth      = $device.LinkWidth
+            MaxLinkSpeed   = $device.MaxLinkSpeed
+            MaxLinkWidth   = $device.MaxLinkWidth
             Link           = (Format-Link $device.LinkSpeed $device.LinkWidth)
             MaxLink        = (Format-Link $device.MaxLinkSpeed $device.MaxLinkWidth)
             IsNvme         = (Test-NvmeController $device)
